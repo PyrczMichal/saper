@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Page Title</title>
+        <meta charset="UTF-8">
+        <style>
+            *{
+                font-size: 20px;
+            }
+
+            body{
+                margin: 0;
+                padding: 0;
+                background: gray;
+            }
+
+            #grid-all{
+                height: 100vh;
+                display: grid;
+                grid-template-rows: 70px auto;
+                grid-template-columns: auto;
+            }
+
+            header{
+                display: flex;
+                justify-content: space-between;
+                padding: 10px 20px;
+                background: red;
+            }
+
+            .display{
+                font-size: 50px;
+                background: black;
+                color: red;
+            }
+
+            button{
+                height: 50px;
+                width: 50px;
+                border: 5px outset;
+            }
+
+            main{
+                margin: 10px;
+                display: flex;
+                //justify-content: center;
+                overflow: auto;
+                background: blue;
+            }
+
+            #minefield{
+                --col: 9;
+                --row: 9;
+                display: grid;
+                grid-template-columns: repeat(var(--col), 50px);
+                grid-template-rows: repeat(var(--row), 50px);
+            }
+
+            .show{
+                background: lightgray;
+                border: none;
+                border-top: 1px solid gray;
+                border-left: 1px solid gray;
+                border-collapse: collapse;
+            }
+        </style>
+    </head>
+    <body oncontextmenu="return false;">
+        <div id="grid-all">
+        <header>
+            <div id="mine-counter" class="display">00</div>
+            <button id="reset" onclick="newGame();">🙂</button>
+            <div id="timer" class="display">00:00</div>
+        </header>
+        <main>
+            <div id="minefield">
+            </div>
+        </main>
+        </div>
+    </body>
+    <script>
+        const mineCounter = document.getElementById("mine-counter");
+        const resetButton = document.getElementById("reset");
+        const timer = document.getElementById("timer");
+        const minefield = document.getElementById("minefield");
+        const fields = minefield.children;
+        var time;
+        var t = 0;
+        var x = 9;
+        var y = 9;
+        var mines = 3;
+        var flags = mines;
+        var victory = x*y-mines;
+        var firstClick = true;
+        var minesPosition = [];
+        var bestUpdated = false;
+        var best = new Array(3);
+
+        function newGame(){
+            resetButton.innerHTML = "🙂";
+            //reseting timer
+            clearInterval(time);
+            t = 0;
+            timer.innerHTML = "00:00";
+            bestUpdated = false;
+            //clearing minefield
+            while (minefield.firstChild) {
+                minefield.removeChild(minefield.firstChild);
+            }
+                
+            firstClick = true;
+            minesPosition = new Array(x*y);
+            //setting size of minefield
+            minefield.style.setProperty('--col', x);
+            minefield.style.setProperty('--row', y);
+            //setting mine-counter
+            flags = mines;
+            mineCounter.innerHTML = (flags < 10 ? "0" : "") + flags;
+
+            victory = x*y-mines;
+
+            for(let i=0; i<x*y;i++){
+                    //preparing mineButton
+                    const mineButton = document.createElement("button");
+                    mineButton.id = "b"+i;
+                    mineButton.onmousedown = function(event) { 
+                        if(event.button == 2 && !(firstClick)){
+                            flag(Number(this.id.substring(1)));
+                        } else if(event.button == 0) {
+                            if(firstClick){
+                                newMinefield(Number(this.id.substring(1)));
+                            }else if(this.innerHTML != "🚩"){
+                                showArea(Number(this.id.substring(1)));
+                            }
+                        }
+                    };
+                    //adding mineButton to html
+                    minefield.appendChild(mineButton);
+            }
+        }
+        //adding mines to minesPosition
+        function newMinefield(n){  
+            //blocking next use of newMinefield()  
+            firstClick = false;
+            //preventing from placing mine on cliked fileld
+            let emptyField = [...Array(x*y).keys()];
+            emptyField.splice(n, 1);       
+            //placing the first mine next to the field that was clicked
+            let firstMine = surrounding(n);
+
+            let roll = Math.floor(Math.random() * firstMine.length);        
+            let position = firstMine[roll]; 
+            emptyField.splice(emptyField.indexOf(position), 1);
+            minesPosition[position] = 9; 
+
+            //placing the remaining mines
+            for(m=1; m < mines; m++){
+                let roll = Math.floor(Math.random() * emptyField.length);        
+                let position = emptyField[roll];      
+                emptyField.splice(roll, 1);
+                minesPosition[position] = 9;    
+            }
+
+            //adding numbers to non mines field
+            emptyField.push(n);
+            
+            for(let i of emptyField){
+                //checking which fields (search) surround the checked field (i)
+                let search = surrounding(i);                
+                //counting how many minutes (9) surrounds the checked field (i)
+                minesPosition[i] = 0;
+                for(let j of search){
+                    if(minesPosition[j]==9){
+                        minesPosition[i]++;
+                    }
+                }
+            }
+
+            showArea(n);
+            //starting timer
+            time = setInterval(counting, 1000);
+        }
+
+        function surrounding(n){
+            let search = [];
+
+            if(n%x>0 && n%x<(x-1) && Math.floor(n/x)%y>0 && Math.floor(n/x)%y<(y-1)){
+                search = [n-1-x, n-x, n+1-x, n-1, n+1, n-1+x, n+x, n+1+x];
+            } else if(n%x>0 && n%x<(x-1) && Math.floor(n/x)%y<(y-1)) {
+                search = [n-1, n+1, n-1+x, n+x, n+1+x];
+            } else if(n%x>0 && Math.floor(n/x)%y>0 && Math.floor(n/x)%y<(y-1)) {
+                search = [n-1-x, n-x, n-1, n-1+x, n+x];
+            } else if(n%x>0 && n%x<(x-1) && Math.floor(n/x)%y>0) {
+                search = [n-1-x, n-x, n+1-x, n-1, n+1];
+            } else if(n%x<(x-1) && Math.floor(n/x)%y>0 && Math.floor(n/x)%y<(y-1)) {
+                search = [n-x, n+1-x, n+1, n+x, n+1+x];
+            } else if(n%x<(x-1) && Math.floor(n/x)%y<(y-1)) {
+                search = [n+1, n+x, n+1+x];
+            } else if(n%x>0 && Math.floor(n/x)%y<(y-1)) {
+                search = [n-1, n-1+x, n+x];
+            } else if(n%x>0 && Math.floor(n/x)%y>0) {
+                search = [n-1-x, n-x, n-1];
+            } else {
+                search = [n-x, n+1-x, n+1];
+            }
+
+            return search;
+        }
+
+        function showArea(n){
+            let thisButton = document.getElementById("b"+n);
+
+            if(minesPosition[n] == 9){ 
+                gameOver(n);
+            } else {
+                thisButton.innerHTML = minesPosition[n];
+                victory --;
+
+                if(minesPosition[n] == 0){
+                    //checking which fields (search) surround the checked field (0)
+                    let search = surrounding(n);
+
+                    for(let i of search){
+                        if(fields[i].innerHTML == "" || fields[i].innerHTML == "🚩" || fields[i].innerHTML == "?"){
+                            showArea(i);
+                        }
+                    }
+                }
+            }
+
+            if(victory == 0 && !bestUpdated){
+                bestUpdated = true;
+                gameWin();
+            }
+
+            thisButton.onmousedown = null;
+        }
+
+        function counting(){
+            t++;
+            let m = Math.floor(t/60);
+            let s = t%60;    
+            timer.innerHTML = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+        }
+
+        function flag(n){
+            let thisButton = document.getElementById("b"+n);
+
+            if(thisButton.innerHTML == ""){
+                thisButton.innerHTML = "🚩";
+                flags--;
+                mineCounter.innerHTML = (flags < 10 && flags >= 0 ? "0" : "") + flags;
+            } else if(thisButton.innerHTML == "🚩"){
+                thisButton.innerHTML = "?";
+                flags++;
+                mineCounter.innerHTML = (flags < 10 && flags >= 0 ? "0" : "") + flags;
+            } else {
+                thisButton.innerHTML = "";
+            }
+        }
+
+        function gameOver(n){
+            resetButton.innerHTML = "🤕";
+            clearInterval(time);
+            
+            for (let i=0; i<fields.length; i++){
+                fields[i].innerHTML = minesPosition[i];
+                if(minesPosition[i]=="9"){
+                    fields[i].innerHTML = "💣";
+                }
+                i.onmousedown = null;
+            }
+            fields[n].innerHTML = "💥";
+        }
+
+        function gameWin(){
+            resetButton.innerHTML = "😎";
+            clearInterval(time);
+
+            for (let i of fields){
+                if(i.innerHTML == "" || i.innerHTML == "🚩"){
+                    i.innerHTML = "🛡";
+                }
+                i.onmousedown = null;
+            }
+            mineCounter.innerHTML = "00";
+
+            if(t < best[0] || best[0] == undefined){
+                best.unshift(t);
+                best.pop();
+                alert(best);
+            } else if(t < best[1] || best[1] == undefined) {
+                best[2] = best[1];
+                best[1] = t;
+                alert(best);
+            } else if(t < best[2] || best[2] == undefined) {
+                best[2] = t
+                alert(best);
+            }
+        }
+    </script>
+</html>
